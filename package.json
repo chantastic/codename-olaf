@@ -7,6 +7,7 @@
     "init": "tsx scripts/init.ts",
     "doctor": "tsx scripts/doctor.ts",
     "dev": "wrangler dev",
+    "build": "wrangler types --check && tsc --noEmit",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit"
