@@ -15,17 +15,14 @@ function escapeHtml(value: string): string {
   });
 }
 
-function page(instanceName: string, instanceEnv: string, instanceDomain: string): string {
-  const safeName = escapeHtml(instanceName);
-  const safeEnv = escapeHtml(instanceEnv);
-  const safeDomain = escapeHtml(instanceDomain);
-
+function document(title: string, body: string): string {
+  const safeTitle = escapeHtml(title);
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${safeName}</title>
+    <title>${safeTitle}</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -103,7 +100,19 @@ function page(instanceName: string, instanceEnv: string, instanceDomain: string)
     </style>
   </head>
   <body>
-    <main>
+${body}
+  </body>
+</html>`;
+}
+
+function homePage(instanceName: string, instanceEnv: string, instanceDomain: string): string {
+  const safeName = escapeHtml(instanceName);
+  const safeEnv = escapeHtml(instanceEnv);
+  const safeDomain = escapeHtml(instanceDomain);
+
+  return document(
+    instanceName,
+    `    <main>
       <p class="eyebrow">Cloud instance</p>
       <h1>${safeName} is running.</h1>
       <p class="status">This Cloudflare Worker is answering requests for ${safeDomain}.</p>
@@ -113,17 +122,34 @@ function page(instanceName: string, instanceEnv: string, instanceDomain: string)
         <dt>Domain</dt>
         <dd>${safeDomain}</dd>
       </dl>
-    </main>
-  </body>
-</html>`;
+    </main>`
+  );
+}
+
+function privatePage(instanceName: string, userEmail: string | null): string {
+  const safeName = escapeHtml(instanceName);
+  const safeUserEmail = userEmail ? escapeHtml(userEmail) : "an authenticated visitor";
+
+  return document(
+    `${instanceName} private page`,
+    `    <main>
+      <p class="eyebrow">Private page</p>
+      <h1>${safeName} is private.</h1>
+      <p class="status">Cloudflare Access let ${safeUserEmail} through.</p>
+    </main>`
+  );
 }
 
 export default {
   fetch(request, env) {
-    const domain = new URL(request.url).host;
+    const url = new URL(request.url);
+    const userEmail = request.headers.get("cf-access-authenticated-user-email");
+    const html = url.pathname === "/private"
+      ? privatePage(env.INSTANCE_NAME, userEmail)
+      : homePage(env.INSTANCE_NAME, env.INSTANCE_ENV, url.host);
 
     return new Response(
-      page(env.INSTANCE_NAME, env.INSTANCE_ENV, domain),
+      html,
       {
         headers: {
           "content-type": "text/html; charset=utf-8"

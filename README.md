@@ -39,6 +39,18 @@ npm run dev
 
 Wrangler serves the Worker locally. The page should show your configured instance name, environment, and domain.
 
+## Private Page
+
+The Worker serves a private page at `/private`. Protect only that page with Cloudflare Access:
+
+1. In Cloudflare Zero Trust, go to **Access controls > Applications**.
+2. Create a **Self-hosted and private** application.
+3. Add the public hostname for your instance domain.
+4. Set the application path to `private*`.
+5. Add an Allow policy for the people who should reach the page.
+
+The root page stays public. Cloudflare Access checks requests before they reach the Worker, and the private page will show the authenticated user email when Access sends it. Without the Access application, `/private` is just another public Worker route.
+
 ## Useful Commands
 
 ```bash
