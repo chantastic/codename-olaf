@@ -1,15 +1,15 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "cloud-instance",
+  "name": "chantastic-cloud",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-13",
   "workers_dev": false,
   "vars": {
-    "INSTANCE_NAME": "Cloud Instance",
+    "INSTANCE_NAME": "Chantastic Cloud",
     "INSTANCE_ENV": "production"
   },
   "route": {
-    "pattern": "cloud.example.com",
+    "pattern": "chantastic.cloud",
     "custom_domain": true
   }
 }
