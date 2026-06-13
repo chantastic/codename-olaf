@@ -50,6 +50,19 @@ npm run deploy
 
 `npm run cf-typegen` refreshes `worker-configuration.d.ts` from `wrangler.jsonc` when you change bindings or variables.
 
+## GitHub Deploys
+
+Pushes to `main` deploy with GitHub Actions after generated types, TypeScript, and Wrangler dry-run checks pass.
+
+Set these repository secrets before relying on push deploys:
+
+```bash
+gh secret set CLOUDFLARE_ACCOUNT_ID --repo chantastic/codename-olaf
+gh secret set CLOUDFLARE_API_TOKEN --repo chantastic/codename-olaf
+```
+
+Use a Cloudflare API token created from the `Edit Cloudflare Workers` template, scoped to the account and zone this Worker deploys to.
+
 ## Notes
 
 - Secrets do not belong in `wrangler.jsonc`. Use `wrangler secret put NAME` for secret values.
