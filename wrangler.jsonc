@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cloud-instance",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-13",
+  "workers_dev": false,
+  "vars": {
+    "INSTANCE_NAME": "Cloud Instance",
+    "INSTANCE_ENV": "production"
+  },
+  "route": {
+    "pattern": "cloud.example.com",
+    "custom_domain": true
+  }
+}
