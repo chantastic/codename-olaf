@@ -17,11 +17,15 @@ type WranglerConfig = {
   name?: unknown;
   main?: unknown;
   compatibility_date?: unknown;
+  compatibility_flags?: unknown;
+  artifacts?: { binding?: unknown; namespace?: unknown; remote?: unknown }[];
   route?: { pattern?: unknown; custom_domain?: unknown };
   routes?: unknown;
   vars?: {
     INSTANCE_NAME?: unknown;
     INSTANCE_ENV?: unknown;
+    KNOWLEDGE_REPO?: unknown;
+    KNOWLEDGE_NAMESPACE?: unknown;
   };
 };
 
@@ -92,6 +96,14 @@ async function main(): Promise<void> {
     ok: isString(config.compatibility_date),
     detail: isString(config.compatibility_date) ? config.compatibility_date : "missing compatibility_date"
   });
+  const compatibilityFlags = Array.isArray(config.compatibility_flags) ? config.compatibility_flags : [];
+  checks.push({
+    label: "Node.js compatibility",
+    ok: compatibilityFlags.includes("nodejs_compat"),
+    detail: compatibilityFlags.includes("nodejs_compat")
+      ? "nodejs_compat is enabled"
+      : "add nodejs_compat for MCP dependencies"
+  });
   checks.push({
     label: "custom domain route",
     ok: isString(config.route?.pattern) && config.route?.custom_domain === true,
@@ -110,6 +122,26 @@ async function main(): Promise<void> {
         ? `${config.vars.INSTANCE_NAME} (${config.vars.INSTANCE_ENV})`
         : "run npm run init to set INSTANCE_NAME and INSTANCE_ENV"
   });
+  const knowledgeRepo = config.vars?.KNOWLEDGE_REPO;
+  const knowledgeNamespace = config.vars?.KNOWLEDGE_NAMESPACE;
+  const artifactsBinding = config.artifacts?.find((binding) => binding.binding === "ARTIFACTS");
+  const hasKnowledgeConfig = isString(knowledgeRepo) || isString(knowledgeNamespace) || Boolean(artifactsBinding);
+
+  if (hasKnowledgeConfig) {
+    checks.push({
+      label: "knowledge repo",
+      ok:
+        isString(knowledgeRepo) &&
+        isString(knowledgeNamespace) &&
+        artifactsBinding?.namespace === knowledgeNamespace,
+      detail:
+        isString(knowledgeRepo) &&
+        isString(knowledgeNamespace) &&
+        artifactsBinding?.namespace === knowledgeNamespace
+          ? `${knowledgeRepo} in Artifacts namespace ${knowledgeNamespace}`
+          : "KNOWLEDGE_REPO, KNOWLEDGE_NAMESPACE, and the ARTIFACTS binding namespace must match"
+    });
+  }
 
   const deployDryRun = await run("npx", ["wrangler", "deploy", "--dry-run"]);
   checks.push({

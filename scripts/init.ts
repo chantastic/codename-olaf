@@ -11,7 +11,9 @@ type WranglerConfig = {
   name?: string;
   main?: string;
   compatibility_date?: string;
+  compatibility_flags?: string[];
   workers_dev?: boolean;
+  artifacts?: { binding?: string; namespace?: string; remote?: boolean }[];
   route?: unknown;
   routes?: unknown[];
   vars?: Record<string, string>;
@@ -22,6 +24,9 @@ type Answers = {
   workerName: string;
   domain: string;
   environment: string;
+  knowledgeEnabled: boolean;
+  knowledgeNamespace: string;
+  knowledgeRepo: string;
 };
 
 function normalizeWorkerName(value: string): string {
@@ -52,6 +57,26 @@ function isDomain(value: string): boolean {
 function inferWorkerName(instanceName: string): string {
   const normalized = normalizeWorkerName(instanceName);
   return normalized || "cloud-instance";
+}
+
+function normalizeRepoName(value: string): string {
+  return normalizeWorkerName(value);
+}
+
+function isRepoName(value: string): boolean {
+  return isWorkerName(value);
+}
+
+function normalizeNamespace(value: string): string {
+  return normalizeWorkerName(value);
+}
+
+function isNamespace(value: string): boolean {
+  return isWorkerName(value);
+}
+
+function isYes(value: string): boolean {
+  return /^(y|yes)$/i.test(value.trim());
 }
 
 async function askUntilValid(
@@ -93,16 +118,32 @@ function updateConfig(source: string, answers: Answers): string {
   set(["name"], answers.workerName);
   set(["main"], "src/index.ts");
   set(["compatibility_date"], compatibilityDate);
+  set(["compatibility_flags"], ["nodejs_compat"]);
   set(["workers_dev"], false);
   set(["route"], {
     pattern: answers.domain,
     custom_domain: true
   });
   set(["routes"], undefined);
-  set(["vars"], {
+  const vars: Record<string, string> = {
     INSTANCE_NAME: answers.instanceName,
     INSTANCE_ENV: answers.environment
-  });
+  };
+
+  if (answers.knowledgeEnabled) {
+    vars.KNOWLEDGE_REPO = answers.knowledgeRepo;
+    vars.KNOWLEDGE_NAMESPACE = answers.knowledgeNamespace;
+    set(["artifacts"], [
+      {
+        binding: "ARTIFACTS",
+        namespace: answers.knowledgeNamespace
+      }
+    ]);
+  } else {
+    set(["artifacts"], undefined);
+  }
+
+  set(["vars"], vars);
 
   return `${updated.trim()}\n`;
 }
@@ -150,13 +191,54 @@ async function main(): Promise<void> {
     );
     const environment = (environmentAnswer.trim() || "production").toLowerCase();
 
+    output.write("\n");
+    const knowledgeAnswer = await rl.question(
+      "Knowledge repository: optionally bind a Cloudflare Artifacts repo for agent-editable Markdown content.\nEnable knowledge repository? [y/N]: "
+    );
+    const knowledgeEnabled = isYes(knowledgeAnswer);
+    let knowledgeNamespace = "default";
+    let knowledgeRepo = "knowledge";
+
+    if (knowledgeEnabled) {
+      output.write("\n");
+      knowledgeNamespace = await askUntilValid(
+        rl,
+        "Artifacts namespace: a grouping for Artifacts repos. The first repo can create the namespace automatically, for example \"default\".\nArtifacts namespace [default]: ",
+        "default",
+        normalizeNamespace,
+        isNamespace,
+        "Please use only lowercase letters, numbers, and hyphens. It cannot start or end with a hyphen."
+      );
+
+      output.write("\n");
+      knowledgeRepo = await askUntilValid(
+        rl,
+        "Knowledge repo name: the Artifacts Git repo that stores Markdown content, for example \"knowledge\".\nKnowledge repo name [knowledge]: ",
+        "knowledge",
+        normalizeRepoName,
+        isRepoName,
+        "Please use only lowercase letters, numbers, and hyphens. It cannot start or end with a hyphen."
+      );
+    }
+
     const current = await readFile(wranglerPath, "utf8");
-    const next = updateConfig(current, { instanceName, workerName, domain, environment });
+    const next = updateConfig(current, {
+      instanceName,
+      workerName,
+      domain,
+      environment,
+      knowledgeEnabled,
+      knowledgeNamespace,
+      knowledgeRepo
+    });
 
     await writeFile(wranglerPath, next);
 
     output.write("\nDone. wrangler.jsonc is now the source of truth for this instance.\n\n");
     output.write("Next commands:\n");
+    if (knowledgeEnabled) {
+      output.write(`  npx wrangler artifacts repos create ${knowledgeRepo} --namespace ${knowledgeNamespace}\n`);
+    }
     output.write("  npm run doctor\n");
     output.write("  npm run deploy\n");
   } finally {

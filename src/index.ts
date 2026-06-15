@@ -1,3 +1,6 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { createMcpHandler } from "agents/mcp";
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => {
     switch (character) {
@@ -105,10 +108,68 @@ ${body}
 </html>`;
 }
 
-function homePage(instanceName: string, instanceEnv: string, instanceDomain: string): string {
+function textToolResult(text: string) {
+  return {
+    content: [{ type: "text" as const, text }]
+  };
+}
+
+function createKnowledgeMcpServer(env: Env, request: Request): McpServer {
+  const server = new McpServer({
+    name: "chantastic-knowledge",
+    version: "0.1.0"
+  });
+
+  server.registerTool(
+    "ping",
+    {
+      description: "Confirm that the Chantastic Cloud knowledge MCP endpoint is reachable.",
+      inputSchema: {}
+    },
+    async () => textToolResult("pong")
+  );
+
+  server.registerTool(
+    "repo_info",
+    {
+      description: "Return the configured Cloudflare Artifacts knowledge repository metadata.",
+      inputSchema: {}
+    },
+    async () => {
+      const repo = await env.ARTIFACTS.get(env.KNOWLEDGE_REPO);
+      const accessEmail = request.headers.get("cf-access-authenticated-user-email");
+      const accessJwtPresent = request.headers.has("cf-access-jwt-assertion");
+
+      return textToolResult(JSON.stringify({
+        repo: {
+          name: repo.name ?? env.KNOWLEDGE_REPO,
+          namespace: env.KNOWLEDGE_NAMESPACE,
+          bindingVerified: true,
+          id: repo.id ?? null,
+          defaultBranch: repo.defaultBranch ?? null,
+          remote: repo.remote ?? null,
+          readOnly: repo.readOnly ?? null,
+          createdAt: repo.createdAt ?? null,
+          updatedAt: repo.updatedAt ?? null,
+          lastPushAt: repo.lastPushAt ?? null,
+          tokenOperationsAvailable: typeof repo.createToken === "function"
+        },
+        access: {
+          authenticatedUserEmail: accessEmail,
+          jwtPresent: accessJwtPresent
+        }
+      }, null, 2));
+    }
+  );
+
+  return server;
+}
+
+function homePage(instanceName: string, instanceEnv: string, instanceDomain: string, knowledgeRepo?: string): string {
   const safeName = escapeHtml(instanceName);
   const safeEnv = escapeHtml(instanceEnv);
   const safeDomain = escapeHtml(instanceDomain);
+  const safeKnowledgeRepo = knowledgeRepo ? escapeHtml(knowledgeRepo) : null;
 
   return document(
     instanceName,
@@ -121,6 +182,8 @@ function homePage(instanceName: string, instanceEnv: string, instanceDomain: str
         <dd>${safeEnv}</dd>
         <dt>Domain</dt>
         <dd>${safeDomain}</dd>
+        ${safeKnowledgeRepo ? `<dt>Knowledge</dt>
+        <dd>${safeKnowledgeRepo}</dd>` : ""}
       </dl>
     </main>`
   );
@@ -141,12 +204,18 @@ function privatePage(instanceName: string, userEmail: string | null): string {
 }
 
 export default {
-  fetch(request, env) {
+  fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/mcp") {
+      const server = createKnowledgeMcpServer(env, request);
+      return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
+    }
+
     const userEmail = request.headers.get("cf-access-authenticated-user-email");
     const html = url.pathname === "/private"
       ? privatePage(env.INSTANCE_NAME, userEmail)
-      : homePage(env.INSTANCE_NAME, env.INSTANCE_ENV, url.host);
+      : homePage(env.INSTANCE_NAME, env.INSTANCE_ENV, url.host, env.KNOWLEDGE_REPO);
 
     return new Response(
       html,

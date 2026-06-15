@@ -3,11 +3,22 @@
   "name": "chantastic-cloud",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-13",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": false,
   "vars": {
     "INSTANCE_NAME": "Chantastic Cloud",
-    "INSTANCE_ENV": "production"
+    "INSTANCE_ENV": "production",
+    "KNOWLEDGE_REPO": "chantastic-knowledge",
+    "KNOWLEDGE_NAMESPACE": "default"
   },
+  "artifacts": [
+    {
+      "binding": "ARTIFACTS",
+      "namespace": "default"
+    }
+  ],
   "route": {
     "pattern": "chantastic.cloud",
     "custom_domain": true
