@@ -1,6 +1,6 @@
 # Cloud Instance Worker Shell
 
-A tiny, open-source-friendly Cloudflare Worker starter for a configurable "cloud instance" hello world. It starts with no auth, AI, storage, queues, framework, or extra modules. After init, `wrangler.jsonc` is the source of truth.
+A tiny, open-source-friendly Cloudflare Worker starter for a configurable "cloud instance" hello world. The root page stays plain and public. The optional MCP endpoint uses Google OAuth, Workers KV, and MCP-native bearer tokens. After init, `wrangler.jsonc` is the source of truth for deployed instance settings.
 
 ## Happy Path
 
@@ -65,60 +65,62 @@ The Worker serves a private page at `/private`. Protect only that page with Clou
 
 The root page stays public. Cloudflare Access checks requests before they reach the Worker, and the private page will show the authenticated user email when Access sends it. Without the Access application, `/private` is just another public Worker route.
 
-## MCP Endpoint
+## MCP Native OAuth
 
-The Worker serves a remote MCP endpoint at `/mcp`.
+The Worker exposes a remote MCP endpoint at `/mcp`. It uses `@cloudflare/workers-oauth-provider` as the OAuth authorization server for MCP clients, then uses Google OAuth as the upstream sign-in provider.
+
+The initial tools are read-only:
+
+- `ping`: confirms that an authenticated MCP client can reach the Worker.
+- `whoami`: returns the Google account authorized for the MCP session.
+- `instance_status`: returns the instance name, environment, domain, MCP path, and server time.
+- `repo_info`: returns metadata for the configured Cloudflare Artifacts knowledge repository.
+
+### Cloudflare Setup
+
+Create one KV namespace for OAuth client, grant, and token records:
+
+```bash
+wrangler kv namespace create OAUTH_KV
+```
+
+Add the generated namespace ID to `wrangler.jsonc` under `kv_namespaces`, then regenerate types:
+
+```bash
+npm run cf-typegen
+```
+
+### Google OAuth Setup
+
+Create a Google OAuth client for a web application. Add this authorized redirect URI:
 
 ```text
-https://your-domain.example/mcp
+https://chantastic.cloud/authorize/callback
 ```
 
-The first MCP tools are intentionally small:
+Store the Google client credentials and allowed Google accounts as Worker secrets:
 
-- `ping`: confirms that an MCP client can reach the Worker.
-- `repo_info`: returns the configured Cloudflare Artifacts repo metadata and whether Cloudflare Access identity headers reached the Worker.
-
-Protect `/mcp*` with Cloudflare Access before adding tools that read or write private knowledge content.
-
-Cloudflare Access is not MCP-native OAuth. If a client reports `auth unsupported`, use an Access service token and a local MCP proxy that can send custom headers:
-
-```json
-{
-  "mcpServers": {
-    "cloud-instance-knowledge": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://your-domain.example/mcp",
-        "--header",
-        "CF-Access-Client-Id:${CF_ACCESS_CLIENT_ID}",
-        "--header",
-        "CF-Access-Client-Secret:${CF_ACCESS_CLIENT_SECRET}"
-      ],
-      "env": {
-        "CF_ACCESS_CLIENT_ID": "<service-token-client-id>",
-        "CF_ACCESS_CLIENT_SECRET": "<service-token-client-secret>"
-      }
-    }
-  }
-}
+```bash
+wrangler secret put GOOGLE_CLIENT_ID
+wrangler secret put GOOGLE_CLIENT_SECRET
+wrangler secret put AUTH_ALLOWED_EMAILS
 ```
 
-The Access application must include a Service Auth policy that allows that service token.
+`AUTH_ALLOWED_EMAILS` is a comma-separated list, for example:
 
-Codex can also send Access service-token headers directly from environment variables:
-
-```toml
-[mcp_servers.cloud_instance_knowledge]
-enabled = true
-url = "https://your-domain.example/mcp"
-
-[mcp_servers.cloud_instance_knowledge.env_http_headers]
-CF-Access-Client-Id = "CF_ACCESS_CLIENT_ID"
-CF-Access-Client-Secret = "CF_ACCESS_CLIENT_SECRET"
+```text
+person@example.com,other@example.com
 ```
 
-The Codex process must have `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` in its environment.
+For local development, put the same values in an uncommitted `.dev.vars` file:
+
+```text
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+AUTH_ALLOWED_EMAILS=person@example.com,other@example.com
+```
+
+The authorization flow fails closed until all three values are configured.
 
 ## Useful Commands
 
@@ -135,4 +137,4 @@ npm run deploy
 
 - Secrets do not belong in `wrangler.jsonc`. Use `wrangler secret put NAME` for secret values.
 - The configured domain must already be in a Cloudflare-managed zone.
-- This shell intentionally includes no persistence, authentication, or application features yet.
+- `/mcp` intentionally adds KV-backed OAuth. Do not put Google credentials or family email lists in `wrangler.jsonc`.

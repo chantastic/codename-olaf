@@ -4,7 +4,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-06-13",
   "compatibility_flags": [
-    "nodejs_compat"
+    "nodejs_compat",
+    "global_fetch_strictly_public"
   ],
   "workers_dev": false,
   "vars": {
@@ -17,6 +18,12 @@
     {
       "binding": "ARTIFACTS",
       "namespace": "default"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "212243d7b0064458a8959bd45ef9f885"
     }
   ],
   "route": {

@@ -118,7 +118,7 @@ function updateConfig(source: string, answers: Answers): string {
   set(["name"], answers.workerName);
   set(["main"], "src/index.ts");
   set(["compatibility_date"], compatibilityDate);
-  set(["compatibility_flags"], ["nodejs_compat"]);
+  set(["compatibility_flags"], ["nodejs_compat", "global_fetch_strictly_public"]);
   set(["workers_dev"], false);
   set(["route"], {
     pattern: answers.domain,

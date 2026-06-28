@@ -19,6 +19,7 @@ type WranglerConfig = {
   compatibility_date?: unknown;
   compatibility_flags?: unknown;
   artifacts?: { binding?: unknown; namespace?: unknown; remote?: unknown }[];
+  kv_namespaces?: Array<{ binding?: unknown; id?: unknown }>;
   route?: { pattern?: unknown; custom_domain?: unknown };
   routes?: unknown;
   vars?: {
@@ -105,6 +106,13 @@ async function main(): Promise<void> {
       : "add nodejs_compat for MCP dependencies"
   });
   checks.push({
+    label: "OAuth fetch compatibility",
+    ok: compatibilityFlags.includes("global_fetch_strictly_public"),
+    detail: compatibilityFlags.includes("global_fetch_strictly_public")
+      ? "global_fetch_strictly_public is enabled"
+      : "add global_fetch_strictly_public for the OAuth provider"
+  });
+  checks.push({
     label: "custom domain route",
     ok: isString(config.route?.pattern) && config.route?.custom_domain === true,
     detail: isString(config.route?.pattern)
@@ -142,6 +150,16 @@ async function main(): Promise<void> {
           : "KNOWLEDGE_REPO, KNOWLEDGE_NAMESPACE, and the ARTIFACTS binding namespace must match"
     });
   }
+
+  checks.push({
+    label: "OAuth KV binding",
+    ok: Array.isArray(config.kv_namespaces) &&
+      config.kv_namespaces.some((namespace) => namespace.binding === "OAUTH_KV" && isString(namespace.id)),
+    detail: Array.isArray(config.kv_namespaces) &&
+      config.kv_namespaces.some((namespace) => namespace.binding === "OAUTH_KV" && isString(namespace.id))
+        ? "OAUTH_KV is configured"
+        : "run wrangler kv namespace create OAUTH_KV and add it to wrangler.jsonc"
+  });
 
   const deployDryRun = await run("npx", ["wrangler", "deploy", "--dry-run"]);
   checks.push({
