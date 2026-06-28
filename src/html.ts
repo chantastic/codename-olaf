@@ -85,6 +85,51 @@ export function document(title: string, body: string): string {
         margin: 0;
       }
 
+      form {
+        margin-top: 32px;
+      }
+
+      .scope-list {
+        margin: 18px 0 0;
+        padding-left: 22px;
+        color: #334247;
+        line-height: 1.6;
+      }
+
+      .client-id {
+        margin-top: 18px;
+        color: #66757a;
+        font-size: 0.9rem;
+        overflow-wrap: anywhere;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      button {
+        min-height: 44px;
+        padding: 0 18px;
+        border: 1px solid currentColor;
+        border-radius: 6px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button[type="submit"] {
+        background: #1d2528;
+        color: #f7f4ef;
+      }
+
+      button.secondary {
+        background: transparent;
+        color: inherit;
+      }
+
       @media (prefers-color-scheme: dark) {
         :root {
           background: #111718;
@@ -93,8 +138,15 @@ export function document(title: string, body: string): string {
 
         .eyebrow,
         .status,
+        .scope-list,
+        .client-id,
         dt {
           color: #a8b8b4;
+        }
+
+        button[type="submit"] {
+          background: #eef4f0;
+          color: #111718;
         }
       }
     </style>
@@ -122,6 +174,51 @@ export function messagePage(title: string, eyebrow: string, heading: string, mes
       <p class="eyebrow">${escapeHtml(eyebrow)}</p>
       <h1>${escapeHtml(heading)}</h1>
       <p class="status">${escapeHtml(message)}</p>
+    </main>`
+  );
+}
+
+export function consentPage(options: {
+  clientId: string;
+  clientName: string;
+  consentId: string;
+  csrfToken: string;
+  instanceName: string;
+  scopes: string[];
+}): string {
+  const safeClientId = escapeHtml(options.clientId);
+  const safeClientName = escapeHtml(options.clientName);
+  const safeConsentId = escapeHtml(options.consentId);
+  const safeCsrfToken = escapeHtml(options.csrfToken);
+  const safeInstanceName = escapeHtml(options.instanceName);
+  const scopeItems = options.scopes.length > 0
+    ? options.scopes.map((scope) => {
+      const label = scope === "mcp:read"
+        ? "Use the available read-only MCP tools"
+        : `Request the ${scope} permission`;
+
+      return `<li>${escapeHtml(label)}</li>`;
+    }).join("\n        ")
+    : "<li>Connect to this MCP server</li>";
+
+  return document(
+    `Authorize ${options.clientName}`,
+    `    <main>
+      <p class="eyebrow">MCP authorization</p>
+      <h1>Allow ${safeClientName}?</h1>
+      <p class="status">This client is asking to connect to ${safeInstanceName}.</p>
+      <ul class="scope-list">
+        ${scopeItems}
+      </ul>
+      <p class="client-id">Client ID: ${safeClientId}</p>
+      <form method="post" action="/authorize">
+        <input type="hidden" name="consent_id" value="${safeConsentId}">
+        <input type="hidden" name="csrf_token" value="${safeCsrfToken}">
+        <div class="actions">
+          <button type="submit" name="decision" value="approve">Continue with Google</button>
+          <button class="secondary" type="submit" name="decision" value="deny">Cancel</button>
+        </div>
+      </form>
     </main>`
   );
 }

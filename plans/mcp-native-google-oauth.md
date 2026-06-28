@@ -2,9 +2,44 @@
 
 ## Status
 
-The initial implementation is present in the Worker. Deployment still requires
-the Google OAuth secrets and OAuth KV namespace described below, followed by a
-live MCP client verification.
+The initial implementation was committed and pushed to `main` in commit
+`ee6a649` (`feat: add MCP-native Google OAuth`). The OAuth KV namespace exists
+and is bound in `wrangler.jsonc`.
+
+Live verification on 2026-06-28 found:
+
+- OAuth authorization-server metadata is live at `chantastic.cloud`.
+- `OAUTH_KV` is configured in the Worker.
+- No Worker secrets are configured yet (`wrangler secret list` returned `[]`).
+- Cloudflare Access still intercepts `/mcp` with a redirect before the request
+  reaches the Worker.
+- The initial commit skipped an explicit MCP client consent page. A follow-up
+  hardens the flow with consent, CSRF protection, CSP headers, sanitized client
+  display values, and browser-bound Google state.
+- Wrangler was updated to `4.105.0`; `npm audit --omit=optional` reports zero
+  vulnerabilities at this checkpoint.
+
+The implementation is therefore fail-closed but not ready for a live MCP client
+until the pickup checklist below is complete.
+
+## Pickup Checklist
+
+1. In Cloudflare Zero Trust, remove the Access application for `/mcp*`, or
+   narrow it so only `/private*` remains protected by Access.
+2. Confirm `curl -i https://chantastic.cloud/mcp` returns `401 Unauthorized`
+   with a `WWW-Authenticate: Bearer` header. A `302` to
+   `cloudflareaccess.com` means Access is still in front of the MCP route.
+3. Create a Google OAuth Web application with this authorized redirect URI:
+   `https://chantastic.cloud/authorize/callback`.
+4. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_ALLOWED_EMAILS`
+   with `wrangler secret put`.
+5. Run `npm run cf-typegen`, `npm run typecheck`, `npm run build`, and
+   `npm run doctor`.
+6. Deploy with `npm run deploy` if the Git integration has not already deployed
+   the latest commit.
+7. Connect the first OAuth-capable MCP client to
+   `https://chantastic.cloud/mcp` and verify consent, Google sign-in, `ping`,
+   `whoami`, and `instance_status`.
 
 The goal is to make the Cloudflare Worker behave like an MCP-native remote
 server. MCP clients should discover OAuth metadata, register or identify
@@ -68,7 +103,13 @@ GET/POST /mcp
   protected by Worker OAuth Provider bearer tokens
 
 GET /authorize
-  OAuth authorization UI and Google login start/finish
+  MCP client consent page
+
+POST /authorize
+  CSRF-checked consent decision and Google login start
+
+GET /authorize/callback
+  Browser-bound Google login finish
 
 POST /oauth/token
   OAuth token endpoint implemented by Worker OAuth Provider
@@ -89,31 +130,21 @@ Create a Google OAuth web application with redirect URIs for the instance:
 https://chantastic.cloud/authorize/callback
 ```
 
-Store credentials as Wrangler secrets:
+Store credentials and the private email allowlist as Wrangler secrets:
 
 ```bash
 wrangler secret put GOOGLE_CLIENT_ID
 wrangler secret put GOOGLE_CLIENT_SECRET
+wrangler secret put AUTH_ALLOWED_EMAILS
 ```
 
-Store non-secret auth settings in `wrangler.jsonc` vars:
-
-```jsonc
-{
-  "vars": {
-    "INSTANCE_NAME": "Chantastic Cloud",
-    "INSTANCE_ENV": "production",
-    "AUTH_ALLOWED_EMAILS": "person@example.com,other@example.com"
-  }
-}
-```
-
-If the allowed user list becomes sensitive or noisy, move it out of committed
-config before implementation.
+`AUTH_ALLOWED_EMAILS` is a comma-separated list of Google email addresses. Do
+not commit that list to `wrangler.jsonc`.
 
 ## OAuth KV
 
-Create one namespace for the instance:
+The instance namespace has already been created. For a fresh clone or a new
+instance, create one namespace:
 
 ```bash
 wrangler kv namespace create OAUTH_KV
@@ -169,8 +200,6 @@ are boring.
 
 ## Open Questions
 
-- Should `AUTH_ALLOWED_EMAILS` be committed for this personal instance, or
-  should allowlisting be represented by an uncommitted secret/config value?
 - Should `/private` remain Cloudflare Access-protected separately, or should it
   eventually reuse the same Google OAuth session?
 - Which MCP client is the first compatibility target?

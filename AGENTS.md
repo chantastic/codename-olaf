@@ -23,21 +23,29 @@ The MVP includes:
 - `scripts/doctor.ts`, which validates local setup and runs a Wrangler deploy dry run.
 - A README with the exact happy path.
 - A `.gitignore` that keeps secrets, local Wrangler state, dependencies, and build output out of Git.
+- An MCP-native `/mcp` endpoint with read-only confidence tools.
+- Google as the upstream identity provider, with the Worker issuing MCP-facing OAuth tokens.
+- Workers KV only for OAuth client, grant, token, consent, and state records.
+- An optional Cloudflare Artifacts binding for an agent-editable knowledge repository.
 
 ## Deliberate Non-Goals
 
 Do not add these until the project explicitly needs them:
 
-- Auth
 - AI
 - D1
 - R2
-- KV
 - Durable Objects
 - Queues
-- Extra modules
 - A frontend framework
 - A separate `instance.config.ts` or other intermediate config layer
+
+Keep the current auth surface narrow:
+
+- Do not add passwords or custom credential storage.
+- Do not add stateful MCP sessions while the read-only stateless transport is sufficient.
+- Do not place `/mcp` behind Cloudflare Access; MCP-native OAuth must reach the Worker directly.
+- Cloudflare Access may continue protecting browser-only routes such as `/private*`.
 
 ## Configuration Rules
 

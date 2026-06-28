@@ -122,6 +122,25 @@ AUTH_ALLOWED_EMAILS=person@example.com,other@example.com
 
 The authorization flow fails closed until all three values are configured.
 
+Before testing an MCP client, make sure Cloudflare Access is not protecting
+`/mcp`. Access may continue to protect `/private*`, but an Access application on
+`/mcp*` intercepts the request before the Worker can return its MCP OAuth
+challenge.
+
+The Worker shows an explicit consent page naming the MCP client and requested
+permissions before redirecting to Google. The consent and Google callback flows
+use one-time, short-lived cookies and KV records.
+
+Confirm the route is ready for MCP-native OAuth:
+
+```bash
+curl -i https://chantastic.cloud/mcp
+```
+
+The expected response is `401 Unauthorized` with a `WWW-Authenticate: Bearer`
+header. A `302` redirect to `cloudflareaccess.com` means the old Access route
+still needs to be removed or narrowed to `/private*`.
+
 ## Useful Commands
 
 ```bash
