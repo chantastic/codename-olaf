@@ -76,9 +76,31 @@ The initial tools are read-only:
 - `instance_status`: returns the instance name, environment, domain, MCP path, and server time.
 - `repo_info`: returns metadata for the configured Cloudflare Artifacts knowledge repository.
 
+### Resume Later
+
+Nothing in this checklist needs to be completed now. The Worker code and OAuth
+KV binding are deployed, but MCP login is intentionally paused until these
+external setup steps are finished:
+
+- [ ] In Cloudflare Zero Trust, remove the Access application for `/mcp*`, or
+  narrow it so Access protects only `/private*`.
+- [ ] Confirm `curl -i https://chantastic.cloud/mcp` returns `401 Unauthorized`
+  with a `WWW-Authenticate: Bearer` header instead of an Access `302` redirect.
+- [ ] Create a Google OAuth Web application with
+  `https://chantastic.cloud/authorize/callback` as an authorized redirect URI.
+- [ ] Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and
+  `AUTH_ALLOWED_EMAILS` using `wrangler secret put`.
+- [ ] Run the local checks and deploy the latest `main` branch.
+- [ ] Connect an OAuth-capable MCP client to `https://chantastic.cloud/mcp` and
+  test consent, Google sign-in, `ping`, `whoami`, and `instance_status`.
+
+The detailed setup notes below are here for that future session.
+
 ### Cloudflare Setup
 
-Create one KV namespace for OAuth client, grant, and token records:
+This step is already complete for the checked-in `chantastic.cloud` instance.
+For a fresh instance, create one KV namespace for OAuth client, grant, and token
+records:
 
 ```bash
 wrangler kv namespace create OAUTH_KV
